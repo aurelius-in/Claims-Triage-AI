@@ -55,32 +55,44 @@ pip install -r requirements.txt
 ```
 Claims-Triage-AI/
 │
-├── README.md
-├── LICENSE
-├── architecture-diagram.png
-├── run-demo.gif
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 │
 ├── api/
-│   ├── main.py                # FastAPI service
+│   ├── main.py
 │   ├── model/
-│   │   └── classifier.py      # ML model logic (sklearn or HuggingFace)
+│   │   ├── classifier.py
+│   │   └── __init__.py
 │   ├── utils/
-│   │   └── router.py          # Rules or ML for routing logic
+│   │   ├── router.py
+│   │   └── __init__.py
 │   └── requirements.txt
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_main.py
+│   ├── test_classifier.py
+│   └── test_router.py
 │
 ├── data/
 │   ├── claims_sample.csv
 │   └── processed_outputs.xlsx
 │
 ├── notebook/
-│   └── training_pipeline.ipynb  # Data cleaning + model training
+│   └── training_pipeline.ipynb
 │
 ├── demo/
 │   ├── run_demo.gif
 │   └── screenshots/
 │       └── triage_output.png
 │
-└── logs/
-    └── triage_log.txt
+├── logs/
+│   └── triage_log.txt
+│
+├── Dockerfile
+├── README.md
+├── LICENSE
+└── .gitignore
 ```
 
