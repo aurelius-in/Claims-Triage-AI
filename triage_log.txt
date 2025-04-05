@@ -1,0 +1,15 @@
+[INFO] 2025-04-05 08:00:01 - API started at http://localhost:8000
+[INFO] 2025-04-05 08:01:12 - Received claim: C001
+[INFO] 2025-04-05 08:01:12 - Urgency: High, Risk: High
+[INFO] 2025-04-05 08:01:12 - Route: Escalate to Clinical Review
+[INFO] 2025-04-05 08:01:13 - Result saved to processed_outputs.xlsx
+
+[INFO] 2025-04-05 08:02:45 - Received claim: C002
+[INFO] 2025-04-05 08:02:45 - Urgency: Low, Risk: Low
+[INFO] 2025-04-05 08:02:45 - Route: Auto-Approve
+[INFO] 2025-04-05 08:02:45 - Result saved to processed_outputs.xlsx
+
+[INFO] 2025-04-05 08:04:17 - Received claim: C003
+[INFO] 2025-04-05 08:04:17 - Urgency: Medium, Risk: Medium
+[INFO] 2025-04-05 08:04:17 - Route: Send to Manual Review Team
+[INFO] 2025-04-05 08:04:17 - Result saved to processed_outputs.xlsx
