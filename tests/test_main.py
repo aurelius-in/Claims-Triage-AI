@@ -1,14 +1,17 @@
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
 client = TestClient(app)
 
-def test_triage_endpoint():
-    response = client.post("/triage", json={"claim_text": "Patient requires emergency surgery due to severe injury."})
+def test_process_claim():
+    """
+    Test the /process-claim endpoint with a sample claim.
+    """
+    sample_claim = {"claim_text": "Patient suffered a minor ankle sprain."}
+    response = client.post("/process-claim", json=sample_claim)
     assert response.status_code == 200
-    data = response.json()
-    assert "urgency" in data
-    assert "risk" in data
-    assert "route" in data
-    assert "explanation" in data
+    response_data = response.json()
+    assert "urgency" in response_data
+    assert "risk" in response_data
+    assert "route" in response_data
+    assert "explanation" in response_data
