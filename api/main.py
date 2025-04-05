@@ -1,13 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from api.model.classifier import classify_claim
-from api.utils.router import determine_route
+from api.model import classify_claim
+from api.utils import determine_route
 
-app = FastAPI(
-    title="Claims Triage API",
-    description="An API for classifying insurance claims based on urgency and risk, and determining appropriate processing routes.",
-    version="1.0.0"
-)
+app = FastAPI()
 
 class ClaimRequest(BaseModel):
     claim_text: str
@@ -18,21 +14,29 @@ class ClaimResponse(BaseModel):
     route: str
     explanation: str
 
-@app.post("/triage", response_model=ClaimResponse)
-async def triage_claim(claim: ClaimRequest):
+@app.post("/process-claim", response_model=ClaimResponse)
+async def process_claim(claim: ClaimRequest):
     """
-    Endpoint to classify an insurance claim's urgency and risk,
-    and determine the appropriate processing route.
+    Endpoint to process an insurance claim and determine its urgency, risk, and processing route.
+
+    Args:
+        claim (ClaimRequest): The insurance claim text.
+
+    Returns:
+        ClaimResponse: The assessed urgency, risk, processing route, and explanation.
     """
-    if not claim.claim_text.strip():
-        raise HTTPException(status_code=400, detail="Claim text cannot be empty.")
+    try:
+        # Classify the claim to determine urgency and risk
+        urgency, risk = classify_claim(claim.claim_text)
 
-    urgency, risk = classify_claim(claim.claim_text)
-    route, explanation = determine_route(claim.claim_text, urgency, risk)
+        # Determine the processing route based on urgency and risk
+        route, explanation = determine_route(claim.claim_text, urgency, risk)
 
-    return ClaimResponse(
-        urgency=urgency,
-        risk=risk,
-        route=route,
-        explanation=explanation
-    )
+        return ClaimResponse(
+            urgency=urgency,
+            risk=risk,
+            route=route,
+            explanation=explanation
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
