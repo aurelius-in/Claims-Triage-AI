@@ -17,6 +17,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  test        - Run all tests"
+	@echo "  test-security - Run security tests"
 	@echo "  test-unit   - Run unit tests only"
 	@echo "  test-api    - Run API tests only"
 	@echo "  test-integration - Run integration tests"
@@ -114,6 +115,10 @@ clean:
 test:
 	@echo "Running all tests..."
 	pytest backend/tests/ -v --cov=backend --cov-report=html --cov-report=term
+
+test-security:
+	@echo "Running security tests..."
+	pytest backend/tests/test_security.py -v --cov=backend.core.security --cov-report=term-missing
 
 test-unit:
 	@echo "Running unit tests..."
