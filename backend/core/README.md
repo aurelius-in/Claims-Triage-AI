@@ -1,287 +1,271 @@
-# Core Module
+# Backend Core Module
 
-This directory contains the core configuration and utilities for the Claims Triage AI platform.
+This module contains the core configuration and utilities for the Claims Triage AI platform.
 
-## Redis Integration
+## Components
 
-The Redis integration provides comprehensive caching, queue management, rate limiting, and session management capabilities.
+### Configuration Management (`config.py`)
+- Application settings with environment variable support
+- Database, Redis, OPA, and Vector Store configuration
+- Security and monitoring settings
 
-## Vector Store Integration (ChromaDB)
+### Logging (`logging.py`)
+- Structured logging configuration
+- Audit log setup
+- Log rotation and formatting
 
-The vector store integration provides RAG (Retrieval Augmented Generation) capabilities for decision support and knowledge base indexing.
+### Monitoring & Observability
 
-### Features
+#### Telemetry (`telemetry.py`)
+OpenTelemetry implementation for distributed tracing and metrics collection.
 
-#### 1. **Redis Client Configuration**
-- Connection pooling with health checks
-- Automatic reconnection and timeout handling
-- Configurable via environment variables (`REDIS_URL`)
+**Features:**
+- Distributed tracing with spans and context propagation
+- Metrics collection for business and technical metrics
+- Log correlation with trace IDs
+- Automatic instrumentation for FastAPI, SQLAlchemy, Redis, and HTTP clients
 
-#### 2. **Caching Layer**
-- Simple key-value caching with expiration
-- JSON serialization for complex objects
-- Error handling and logging
+**Key Functions:**
+```python
+# Setup telemetry
+setup_telemetry(
+    service_name="claims-triage-ai",
+    service_version="1.0.0",
+    environment="development",
+    otlp_endpoint=None,
+    enable_console_export=True,
+    enable_otlp_export=False
+)
+
+# Trace spans
+with trace_span("operation_name", attributes={"key": "value"}) as span:
+    # Your code here
+    pass
+
+# Record metrics
+record_request_metric("GET", "/api/cases", 200, 1.5, success=True)
+record_triage_metric("insurance", 2.5, success=True, risk_score=0.7)
+record_agent_execution_metric("classifier", 1.0, success=True, confidence=0.9)
+
+# Function decorator
+@trace_function("function_name")
+def my_function():
+    return "result"
+```
+
+#### Prometheus (`prometheus.py`)
+Prometheus metrics collection and exposure.
+
+**Features:**
+- Custom business metrics for triage operations
+- Agent performance metrics
+- System health metrics
+- Integration with Prometheus client library
+
+**Key Metrics:**
+- `triage_requests_total`: Total number of triage requests
+- `triage_duration_seconds`: Time spent processing triage requests
+- `agent_executions_total`: Total number of agent executions
+- `risk_scores`: Distribution of risk scores
+- `confidence_scores`: Distribution of confidence scores
+- `errors_total`: Total number of errors
+- `active_requests`: Number of active requests
 
 **Usage:**
 ```python
-from backend.core.redis import cache_set_json, cache_get_json
+# Get metrics collector
+collector = get_metrics_collector()
 
-# Cache data
-await cache_set_json("user:123", {"name": "John", "role": "admin"}, expire=3600)
+# Record metrics
+collector.record_triage_request("insurance", "success", "normal", 1.5)
+collector.record_agent_execution("classifier", "success", "insurance", 0.8, 0.9)
 
-# Retrieve cached data
-user_data = await cache_get_json("user:123")
+# Context managers for automatic tracking
+with track_request("endpoint_name"):
+    # Request processing
+    pass
+
+with track_agent_execution("classifier", "insurance"):
+    # Agent execution
+    pass
+
+with track_triage_request("insurance", "high"):
+    # Triage processing
+    pass
 ```
 
-#### 3. **Queue Management**
-- Priority-based job queues using Redis sorted sets
-- Job enqueueing and dequeuing with metadata
-- Queue length monitoring
+#### Monitoring (`monitoring.py`)
+High-level monitoring orchestration and health checks.
+
+**Features:**
+- Unified monitoring setup
+- Application instrumentation
+- Health status reporting
+- System metrics updates
 
 **Usage:**
 ```python
-from backend.core.redis import enqueue_job, dequeue_job, get_queue_length
+# Setup monitoring
+setup_monitoring(
+    enable_telemetry=True,
+    enable_prometheus=True,
+    prometheus_port=9090,
+    environment="development"
+)
 
-# Enqueue a job
-await enqueue_job("background_jobs", {
-    "type": "process_document",
-    "document_id": "123",
-    "priority": 1
-})
+# Instrument application
+instrument_application(app, engine)
 
-# Dequeue a job
-job = await dequeue_job("background_jobs")
-
-# Check queue length
-length = await get_queue_length("background_jobs")
+# Get health status
+status = get_health_status()
 ```
 
-#### 4. **Rate Limiting**
-- Per-IP rate limiting with configurable limits
-- Sliding window implementation
-- Middleware integration
+### Authentication (`auth.py`)
+- JWT token management
+- Role-based access control
+- User authentication utilities
 
-**Usage:**
-```python
-from backend.core.redis import check_rate_limit
+### Redis Integration (`redis.py`)
+- Redis client configuration
+- Caching layer implementation
+- Queue management for background jobs
+- Rate limiting and session management
 
-# Check if rate limit is exceeded
-allowed = await check_rate_limit("rate_limit:192.168.1.1", limit=60, window=60)
+### Vector Store (`vector_store.py`)
+- ChromaDB client configuration
+- Embedding generation and storage
+- RAG capabilities for knowledge base
+- Document similarity search
+
+### Background Jobs (`background_jobs.py`)
+- Background job processor
+- Queue management
+- Job execution and monitoring
+
+### OPA Integration (`opa.py`)
+- Open Policy Agent client
+- Policy management and evaluation
+- Hot-reloading capabilities
+- Access control and compliance policies
+
+## API Endpoints
+
+### Health Check
 ```
-
-#### 5. **Session Management**
-- User session storage with expiration
-- Session data serialization
-- Clean session cleanup
-
-**Usage:**
-```python
-from backend.core.redis import set_session, get_session, delete_session
-
-# Set session
-await set_session("session:abc123", {"user_id": "123", "role": "admin"}, expire=1800)
-
-# Get session
-session_data = await get_session("session:abc123")
-
-# Delete session
-await delete_session("session:abc123")
+GET /health
 ```
+Returns comprehensive health status including monitoring components.
 
-#### 6. **Health Monitoring**
-- Redis health check endpoint
-- Connection status monitoring
-- Performance metrics collection
-
-**Usage:**
-```python
-from backend.core.redis import redis_health_check
-
-# Check Redis health
-health = await redis_health_check()
-# Returns: {"status": "healthy", "version": "7.0.0", ...}
+### Prometheus Metrics
 ```
+GET /metrics
+```
+Exposes Prometheus-formatted metrics for scraping.
 
-### API Endpoints
+## Monitoring Stack
 
-The Redis integration adds several new API endpoints:
+### Prometheus Configuration
+- **Location**: `monitoring/prometheus/prometheus.yml`
+- **Port**: 9090
+- **Scrape Targets**: Backend API, Redis, PostgreSQL
+- **Recording Rules**: `monitoring/prometheus/recording_rules.yml`
 
-#### Rate Limiting
-- Automatically applied to all endpoints via middleware
-- Configurable via `RATE_LIMIT_PER_MINUTE` setting
+### Grafana Configuration
+- **Location**: `monitoring/grafana/`
+- **Port**: 3001
+- **Default Credentials**: admin/admin
+- **Dashboards**: Auto-provisioned from `monitoring/grafana/dashboards/`
 
-#### Queue Management
-- `POST /api/v1/queue/jobs` - Enqueue background job
-- `GET /api/v1/queue/status` - Get queue status
+### Key Dashboards
+1. **Overview Dashboard** (`overview.json`)
+   - Request rates and success rates
+   - Processing time distributions
+   - Agent performance metrics
+   - Error rates and system resources
 
-#### Health Check
-- `GET /health` - Includes Redis health status
-
-### Configuration
-
-Redis configuration is handled via environment variables:
+## Makefile Commands
 
 ```bash
-# Redis connection URL
-REDIS_URL=redis://localhost:6379
+# Setup monitoring stack
+make monitoring
 
-# Rate limiting
-RATE_LIMIT_PER_MINUTE=60
+# Test telemetry setup
+make telemetry
+
+# Open monitoring interfaces
+make prometheus
+make grafana
 ```
 
-### Error Handling
-
-All Redis operations include comprehensive error handling:
-- Connection failures are logged but don't crash the application
-- Cache misses are handled gracefully
-- Queue operations include retry logic
-- Rate limiting falls back to allowing requests if Redis is down
-
-### Performance Considerations
-
-- Connection pooling reduces connection overhead
-- JSON serialization is optimized for common data types
-- Cache expiration prevents memory bloat
-- Priority queues ensure important jobs are processed first
-
-### Vector Store Features
-
-#### 1. **ChromaDB Client Configuration**
-- Persistent storage with automatic backups
-- Embedding model management (all-MiniLM-L6-v2)
-- Collection management for different data types
-- Health monitoring and status checks
-
-#### 2. **Knowledge Base Management**
-- Add and search knowledge base entries
-- Category-based filtering and organization
-- Similarity-based retrieval with configurable thresholds
-- Metadata enrichment and tagging
-
-**Usage:**
-```python
-from backend.core.vector_store import add_knowledge_base_entry, search_knowledge_base
-
-# Add knowledge base entry
-entry_id = await add_knowledge_base_entry(
-    content="Auto insurance claims require police reports...",
-    metadata={"domain": "insurance", "category": "auto_claims"},
-    category="auto_claims"
-)
-
-# Search knowledge base
-results = await search_knowledge_base(
-    query="What documents are needed for auto claims?",
-    n_results=5,
-    category="auto_claims"
-)
-```
-
-#### 3. **Document Embedding and Similarity Search**
-- Document embedding generation and storage
-- Similarity-based document retrieval
-- Metadata preservation and search
-- Configurable similarity thresholds
-
-**Usage:**
-```python
-from backend.core.vector_store import add_document_embedding, find_similar_documents
-
-# Add document embedding
-doc_id = await add_document_embedding(
-    document_id="doc_123",
-    content="Claim document content...",
-    metadata={"case_id": "case_456", "document_type": "police_report"}
-)
-
-# Find similar documents
-similar_docs = await find_similar_documents(
-    content="Similar claim document...",
-    n_results=5,
-    threshold=0.7
-)
-```
-
-#### 4. **Policy and SOP Management**
-- Policy document storage and retrieval
-- Standard Operating Procedure management
-- Version control and metadata tracking
-- Category-based organization
-
-**Usage:**
-```python
-from backend.core.vector_store import add_policy, add_sop, search_policies, search_sops
-
-# Add policy
-policy_id = await add_policy(
-    policy_name="Fraud Detection Policy",
-    content="All claims over $10,000 require...",
-    metadata={"policy_type": "fraud", "version": "1.0"}
-)
-
-# Add SOP
-sop_id = await add_sop(
-    sop_name="Claim Intake Procedure",
-    content="1. Verify claimant identity...",
-    metadata={"sop_type": "intake", "version": "1.0"}
-)
-```
-
-#### 5. **Decision Support System**
-- Multi-source knowledge retrieval
-- Context-aware decision recommendations
-- Policy and procedure integration
-- Confidence scoring and ranking
-
-**Usage:**
-```python
-from backend.core.vector_store import get_decision_support
-
-# Get decision support
-support_info = await get_decision_support(
-    case_context="Auto accident claim with $15,000 in damages",
-    decision_type="fraud_assessment",
-    n_results=3
-)
-```
-
-### Vector Store API Endpoints
-
-The vector store integration adds several new API endpoints:
-
-#### Knowledge Base Management
-- `POST /api/v1/vector-store/knowledge-base` - Add knowledge base entry
-- `GET /api/v1/vector-store/knowledge-base/search` - Search knowledge base
-
-#### Document Management
-- `POST /api/v1/vector-store/documents` - Add document embedding
-- `GET /api/v1/vector-store/documents/similar` - Find similar documents
-
-#### Decision Support
-- `POST /api/v1/vector-store/decision-support` - Get decision support information
-
-### Vector Store Configuration
-
-ChromaDB configuration is handled via environment variables:
+## Environment Variables
 
 ```bash
-# ChromaDB settings (optional - uses defaults)
-CHROMA_DB_PATH=./chroma_db
-EMBEDDING_MODEL=all-MiniLM-L6-v2
+# Monitoring
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3001
+
+# Telemetry
+OTLP_ENDPOINT=http://localhost:4317  # Optional OTLP endpoint
+ENVIRONMENT=development
 ```
 
-### Vector Store Error Handling
+## Testing
 
-All vector store operations include comprehensive error handling:
-- Connection failures are logged but don't crash the application
-- Embedding generation failures are handled gracefully
-- Search operations include fallback mechanisms
-- Health checks provide detailed status information
+Run observability tests:
+```bash
+cd backend
+pytest tests/test_observability.py -v
+```
 
-### Vector Store Performance Considerations
+## Integration
 
-- Embedding model is loaded once and reused
-- Collections are optimized for different data types
-- Similarity thresholds prevent irrelevant results
-- Metadata filtering improves search performance
-- Persistent storage ensures data durability
+The observability components are automatically integrated into the main application:
+
+1. **Startup**: Telemetry and Prometheus are initialized during app startup
+2. **Instrumentation**: FastAPI, SQLAlchemy, Redis, and HTTP clients are automatically instrumented
+3. **Metrics**: Business metrics are automatically collected during operations
+4. **Health Checks**: Comprehensive health status is available via `/health` endpoint
+5. **Monitoring**: Prometheus metrics are exposed via `/metrics` endpoint
+
+## Performance Considerations
+
+- **Sampling**: Configure trace sampling for high-volume environments
+- **Metrics Cardinality**: Use appropriate labels to avoid high cardinality issues
+- **Storage**: Configure retention policies for metrics and traces
+- **Resource Usage**: Monitor the impact of observability on application performance
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Prometheus Connection Refused**
+   - Check if Prometheus server is running on port 9090
+   - Verify firewall settings
+
+2. **Grafana Login Issues**
+   - Default credentials: admin/admin
+   - Check if Grafana is running on port 3001
+
+3. **Metrics Not Appearing**
+   - Verify Prometheus is scraping the `/metrics` endpoint
+   - Check application logs for telemetry errors
+
+4. **High Memory Usage**
+   - Consider reducing metrics retention
+   - Check for memory leaks in custom metrics
+
+### Debug Commands
+
+```bash
+# Check monitoring status
+curl http://localhost:8000/health
+
+# View raw metrics
+curl http://localhost:8000/metrics
+
+# Test telemetry setup
+make telemetry
+
+# Check Prometheus targets
+curl http://localhost:9090/api/v1/targets
+```

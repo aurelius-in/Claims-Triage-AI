@@ -15,10 +15,14 @@ from datetime import datetime
 
 from .core.config import settings, get_settings
 from .core.logging import setup_logging
-from .core.monitoring import setup_monitoring
-from .core.auth import get_current_user, create_access_token
+from .core.monitoring import setup_monitoring, instrument_application, shutdown_monitoring, get_health_status
+from .core.telemetry import trace_span, record_request_metric, record_triage_metric, record_agent_execution_metric
+from .core.prometheus import get_metrics, get_metrics_content_type
+from .core.auth import get_current_user, create_access_token, can_access_case
 from .core.redis import init_redis, close_redis, redis_health_check, check_rate_limit, cache_get_json, cache_set_json, enqueue_job, get_queue_length
 from .core.vector_store import init_vector_store, close_vector_store, vector_store_health_check
+from .core.opa import init_opa, close_opa, opa_health_check
+from .core.background_jobs import start_background_processor, stop_background_processor
 from .data.schemas import *
 from .data.database import get_db, init_db, close_db
 from .data.repository import (
@@ -61,21 +65,44 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Vector store initialization failed - RAG features may be limited")
     
+    # Initialize OPA
+    opa_ok = await init_opa()
+    if opa_ok:
+        logger.info("OPA initialized")
+    else:
+        logger.warning("OPA initialization failed - policy features may be limited")
+    
     # Initialize orchestrator
     orchestrator = AgentOrchestrator()
     logger.info("Agent orchestrator initialized")
     
-    # Setup monitoring
-    setup_monitoring()
+    # Setup monitoring and telemetry
+    setup_monitoring(
+        enable_telemetry=True,
+        enable_prometheus=True,
+        prometheus_port=settings.prometheus_port,
+        environment="development"
+    )
     logger.info("Monitoring setup complete")
+    
+    # Instrument the application
+    instrument_application(app)
+    logger.info("Application instrumentation complete")
+    
+    # Start background job processor
+    asyncio.create_task(start_background_processor())
+    logger.info("Background job processor started")
     
     yield
     
     # Shutdown
     logger.info("Shutting down Claims Triage AI application...")
+    await stop_background_processor()
+    shutdown_monitoring()
     await close_db()
     await close_redis()
     await close_vector_store()
+    await close_opa()
 
 
 # Create FastAPI app
@@ -138,38 +165,16 @@ async def global_exception_handler(request, exc):
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint."""
-    global orchestrator
-    
-    if not orchestrator:
-        return HealthCheck(
-            status="unhealthy",
-            version=settings.app_version,
-            timestamp=datetime.utcnow(),
-            services={"orchestrator": "not_initialized"},
-            database="unknown",
-            redis="unknown",
-            opa="unknown",
-            vector_store="unknown"
-        )
-    
-    # Get agent health status
-    health_status = await orchestrator.health_check()
-    
-    # Get Redis health
-    redis_health = await redis_health_check()
-    
-    # Get Vector Store health
-    vector_store_health = await vector_store_health_check()
-    
-    return HealthCheck(
-        status=health_status["overall_status"],
-        version=settings.app_version,
-        timestamp=datetime.utcnow(),
-        services={agent: status["status"] for agent, status in health_status["agents"].items()},
-        database="connected",  # TODO: Add actual DB health check
-        redis=redis_health["status"],
-        opa="connected",       # TODO: Add actual OPA health check
-        vector_store=vector_store_health["status"]
+    return get_health_status()
+
+
+# Prometheus metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(
+        content=get_metrics(),
+        media_type=get_metrics_content_type()
     )
 
 
@@ -825,6 +830,54 @@ async def get_queue_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_v1_router.get("/cache/stats")
+async def get_cache_stats(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Get cache statistics."""
+    try:
+        from .core.redis import get_cache_stats
+        stats = await get_cache_stats()
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Cache stats failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.delete("/cache/clear")
+async def clear_cache(
+    pattern: str = "*",
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Clear cache entries matching pattern."""
+    try:
+        from .core.redis import clear_cache_pattern
+        await clear_cache_pattern(pattern)
+        return {"message": f"Cache cleared for pattern: {pattern}"}
+        
+    except Exception as e:
+        logger.error(f"Cache clear failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/cache/idempotency")
+async def set_idempotency_key_endpoint(
+    key: str,
+    expire: int = 300,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Set idempotency key."""
+    try:
+        from .core.redis import set_idempotency_key
+        success = await set_idempotency_key(key, expire)
+        return {"success": success, "key": key}
+        
+    except Exception as e:
+        logger.error(f"Idempotency key set failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Vector Store endpoints
 @api_v1_router.post("/vector-store/knowledge-base")
 async def add_knowledge_base_entry(
@@ -943,6 +996,196 @@ async def get_decision_support(
         
     except Exception as e:
         logger.error(f"Decision support failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# OPA Policy endpoints
+@api_v1_router.post("/policies/routing/evaluate")
+async def evaluate_routing_policy_endpoint(
+    case_data: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Evaluate routing policy for case assignment."""
+    try:
+        from .core.opa import evaluate_routing_policy
+        
+        result = await evaluate_routing_policy(case_data)
+        
+        return {
+            "case_data": case_data,
+            "routing_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Routing policy evaluation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/policies/compliance/evaluate")
+async def evaluate_compliance_policy_endpoint(
+    case_data: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Evaluate compliance policy for case validation."""
+    try:
+        from .core.opa import evaluate_compliance_policy
+        
+        result = await evaluate_compliance_policy(case_data)
+        
+        return {
+            "case_data": case_data,
+            "compliance_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Compliance policy evaluation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/policies/access-control/evaluate")
+async def evaluate_access_control_policy_endpoint(
+    user_data: dict,
+    resource_data: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Evaluate access control policy."""
+    try:
+        from .core.opa import evaluate_access_control_policy
+        
+        result = await evaluate_access_control_policy(user_data, resource_data)
+        
+        return {
+            "user_data": user_data,
+            "resource_data": resource_data,
+            "access_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Access control policy evaluation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/policies/data-governance/evaluate")
+async def evaluate_data_governance_policy_endpoint(
+    data_operation: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Evaluate data governance policy."""
+    try:
+        from .core.opa import evaluate_data_governance_policy
+        
+        result = await evaluate_data_governance_policy(data_operation)
+        
+        return {
+            "data_operation": data_operation,
+            "governance_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Data governance policy evaluation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/policies")
+async def create_policy_endpoint(
+    policy_name: str,
+    policy_content: str,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Create a new policy."""
+    try:
+        from .core.opa import create_policy
+        
+        result = await create_policy(policy_name, policy_content)
+        
+        return {
+            "policy_name": policy_name,
+            "result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Policy creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.put("/policies/{policy_name}")
+async def update_policy_endpoint(
+    policy_name: str,
+    policy_content: str,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Update an existing policy."""
+    try:
+        from .core.opa import update_policy
+        
+        result = await update_policy(policy_name, policy_content)
+        
+        return {
+            "policy_name": policy_name,
+            "result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Policy update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.delete("/policies/{policy_name}")
+async def delete_policy_endpoint(
+    policy_name: str,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Delete a policy."""
+    try:
+        from .core.opa import delete_policy
+        
+        result = await delete_policy(policy_name)
+        
+        return {
+            "policy_name": policy_name,
+            "result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Policy deletion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.get("/policies")
+async def list_policies_endpoint(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """List all available policies."""
+    try:
+        from .core.opa import list_policies
+        
+        result = await list_policies()
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Policy listing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/policies/validate")
+async def validate_policy_endpoint(
+    policy_content: str,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Validate policy syntax and structure."""
+    try:
+        from .core.opa import validate_policy
+        
+        result = await validate_policy(policy_content)
+        
+        return {
+            "policy_content": policy_content,
+            "validation_result": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Policy validation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

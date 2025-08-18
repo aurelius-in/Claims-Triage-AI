@@ -29,6 +29,12 @@ scikit-learn==1.3.2
 xgboost==2.0.2
 joblib==1.3.2
 
+# ML Explainability and Visualization
+shap==0.44.0
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.17.0
+
 # LLM and AI
 openai==1.3.7
 anthropic==0.7.8

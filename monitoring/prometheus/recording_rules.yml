@@ -1,0 +1,115 @@
+groups:
+  - name: claims_triage_ai_recording_rules
+    rules:
+      # Request rate calculations
+      - record: triage_requests_per_second
+        expr: rate(triage_requests_total[5m])
+      
+      - record: http_requests_per_second
+        expr: rate(http_requests_total[5m])
+      
+      - record: agent_executions_per_second
+        expr: rate(agent_executions_total[5m])
+      
+      # Error rate calculations
+      - record: triage_error_rate
+        expr: rate(triage_requests_total{status="error"}[5m]) / rate(triage_requests_total[5m])
+      
+      - record: http_error_rate
+        expr: rate(http_requests_total{status="error"}[5m]) / rate(http_requests_total[5m])
+      
+      - record: agent_error_rate
+        expr: rate(agent_executions_total{status="error"}[5m]) / rate(agent_executions_total[5m])
+      
+      # Success rate calculations
+      - record: triage_success_rate
+        expr: rate(triage_requests_total{status="success"}[5m]) / rate(triage_requests_total[5m])
+      
+      - record: http_success_rate
+        expr: rate(http_requests_total{status="success"}[5m]) / rate(http_requests_total[5m])
+      
+      - record: agent_success_rate
+        expr: rate(agent_executions_total{status="success"}[5m]) / rate(agent_executions_total[5m])
+      
+      # Latency percentiles
+      - record: triage_duration_p95
+        expr: histogram_quantile(0.95, rate(triage_duration_seconds_bucket[5m]))
+      
+      - record: triage_duration_p99
+        expr: histogram_quantile(0.99, rate(triage_duration_seconds_bucket[5m]))
+      
+      - record: http_request_duration_p95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+      
+      - record: http_request_duration_p99
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+      
+      - record: agent_execution_duration_p95
+        expr: histogram_quantile(0.95, rate(agent_execution_duration_seconds_bucket[5m]))
+      
+      - record: agent_execution_duration_p99
+        expr: histogram_quantile(0.99, rate(agent_execution_duration_seconds_bucket[5m]))
+      
+      # Average processing times
+      - record: triage_duration_avg
+        expr: rate(triage_duration_seconds_sum[5m]) / rate(triage_duration_seconds_count[5m])
+      
+      - record: http_request_duration_avg
+        expr: rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])
+      
+      - record: agent_execution_duration_avg
+        expr: rate(agent_execution_duration_seconds_sum[5m]) / rate(agent_execution_duration_seconds_count[5m])
+      
+      # Risk score statistics
+      - record: risk_score_avg
+        expr: rate(risk_scores_sum[5m]) / rate(risk_scores_count[5m])
+      
+      - record: risk_score_p95
+        expr: histogram_quantile(0.95, rate(risk_scores_bucket[5m]))
+      
+      - record: high_risk_cases_rate
+        expr: rate(risk_scores_count{risk_level="high"}[5m])
+      
+      # Confidence score statistics
+      - record: confidence_score_avg
+        expr: rate(confidence_scores_sum[5m]) / rate(confidence_scores_count[5m])
+      
+      - record: confidence_score_p95
+        expr: histogram_quantile(0.95, rate(confidence_scores_bucket[5m]))
+      
+      # Queue metrics
+      - record: queue_size_avg
+        expr: avg(queue_size) by (queue_name)
+      
+      - record: queue_size_max
+        expr: max(queue_size) by (queue_name)
+      
+      # System health metrics
+      - record: memory_usage_percent
+        expr: (memory_usage_bytes / 1024 / 1024 / 1024) * 100
+      
+      - record: database_connections_avg
+        expr: avg(database_connections) by (database)
+      
+      - record: redis_connections_avg
+        expr: avg(redis_connections) by (redis_instance)
+      
+      # Business KPIs
+      - record: cases_processed_per_hour
+        expr: rate(cases_processed_today[1h])
+      
+      - record: sla_violations_per_hour
+        expr: rate(sla_violations[1h])
+      
+      - record: sla_compliance_rate
+        expr: 1 - (rate(sla_violations[1h]) / rate(cases_processed_today[1h]))
+      
+      # Agent performance by type
+      - record: agent_execution_rate_by_type
+        expr: rate(agent_executions_total[5m]) by (agent_name, case_type)
+      
+      - record: agent_success_rate_by_type
+        expr: rate(agent_executions_total{status="success"}[5m]) by (agent_name, case_type) / rate(agent_executions_total[5m]) by (agent_name, case_type)
+      
+      - record: agent_duration_avg_by_type
+        expr: rate(agent_execution_duration_seconds_sum[5m]) by (agent_name, case_type) / rate(agent_execution_duration_seconds_count[5m]) by (agent_name, case_type)

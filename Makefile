@@ -35,6 +35,8 @@ help:
 	@echo "  health      - Check system health"
 	@echo "  grafana     - Open Grafana dashboard"
 	@echo "  prometheus  - Open Prometheus metrics"
+	@echo "  monitoring  - Setup monitoring stack"
+	@echo "  telemetry   - Test telemetry setup"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  docs        - Build documentation"
@@ -153,6 +155,37 @@ seed-knowledge-base:
 	docker-compose exec backend python backend/scripts/seed_knowledge_base.py
 	@echo "Knowledge base seeded!"
 
+redis-test:
+	@echo "Testing Redis integration..."
+	docker-compose exec backend python backend/tests/test_redis_integration.py
+	@echo "Redis tests completed!"
+
+redis-flush:
+	@echo "Flushing Redis cache..."
+	docker-compose exec redis redis-cli FLUSHALL
+	@echo "Redis cache flushed!"
+
+redis-monitor:
+	@echo "Monitoring Redis..."
+	docker-compose exec redis redis-cli MONITOR
+
+opa-test:
+	@echo "Testing OPA integration..."
+	docker-compose exec backend python backend/tests/test_opa_integration.py
+	@echo "OPA tests completed!"
+
+opa-policies:
+	@echo "Listing OPA policies..."
+	docker-compose exec opa opa list policies
+
+opa-health:
+	@echo "Checking OPA health..."
+	curl -s http://localhost:8181/health | jq .
+
+opa-reload:
+	@echo "Reloading OPA policies..."
+	docker-compose exec opa opa reload
+
 db-init: ## Initialize database with tables and seed data
 	@echo "Initializing database..."
 	cd backend && python scripts/init_db.py
@@ -200,6 +233,18 @@ grafana:
 prometheus:
 	@echo "Opening Prometheus metrics..."
 	open http://localhost:9090
+
+monitoring:
+	@echo "Setting up monitoring stack..."
+	@docker-compose up -d prometheus grafana
+	@echo "Monitoring stack started:"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana: http://localhost:3001 (admin/admin)"
+
+telemetry:
+	@echo "Testing telemetry setup..."
+	@cd backend && python -c "from core.telemetry import setup_telemetry; setup_telemetry(); print('✅ Telemetry setup successful')"
+	@cd backend && python -c "from core.prometheus import get_metrics_collector; print('✅ Prometheus metrics collector available')"
 
 # Documentation
 docs:
@@ -299,6 +344,31 @@ frontend-type-check:
 frontend-clean:
 	@echo "Cleaning frontend build artifacts..."
 	cd frontend && rm -rf build node_modules/.cache
+
+# ML/MLOps Commands
+ml-train-risk:
+	@echo "Training risk model..."
+	cd backend && python ml/train.py --model-type risk --data-path ../data/claims_sample.csv --target-column risk_score --hyperparameter-tuning --cross-validate --generate-explanations
+
+ml-train-classification:
+	@echo "Training classification model..."
+	cd backend && python ml/train.py --model-type classification --data-path ../data/claims_sample.csv --text-column description --target-column claim_type --cross-validate
+
+ml-eval:
+	@echo "Evaluating model..."
+	cd backend && python ml/eval.py --model-id $(MODEL_ID) --data-path ../data/claims_sample.csv --target-column risk_score --generate-explanations
+
+ml-list-models:
+	@echo "Listing models in registry..."
+	cd backend && python -c "from ml.registry import list_models; models = list_models(); print('Models:', models)"
+
+ml-cleanup:
+	@echo "Cleaning up old model versions..."
+	cd backend && python -c "from ml.registry import cleanup_old_models; cleanup_old_models()"
+
+ml-validate-registry:
+	@echo "Validating model registry..."
+	cd backend && python -c "from ml.registry import validate_model_registry; result = validate_model_registry(); print('Validation result:', result)"
 
 # Quick start for new developers
 quickstart: setup up
