@@ -17,6 +17,8 @@ from .core.config import settings, get_settings
 from .core.logging import setup_logging
 from .core.monitoring import setup_monitoring
 from .core.auth import get_current_user, create_access_token
+from .core.redis import init_redis, close_redis, redis_health_check, check_rate_limit, cache_get_json, cache_set_json, enqueue_job, get_queue_length
+from .core.vector_store import init_vector_store, close_vector_store, vector_store_health_check
 from .data.schemas import *
 from .data.database import get_db, init_db, close_db
 from .data.repository import (
@@ -45,6 +47,20 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
+    # Initialize Redis
+    redis_ok = await init_redis()
+    if redis_ok:
+        logger.info("Redis initialized")
+    else:
+        logger.warning("Redis initialization failed - some features may be limited")
+    
+    # Initialize Vector Store
+    vector_store_ok = await init_vector_store()
+    if vector_store_ok:
+        logger.info("Vector store initialized")
+    else:
+        logger.warning("Vector store initialization failed - RAG features may be limited")
+    
     # Initialize orchestrator
     orchestrator = AgentOrchestrator()
     logger.info("Agent orchestrator initialized")
@@ -58,6 +74,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down Claims Triage AI application...")
     await close_db()
+    await close_redis()
+    await close_vector_store()
 
 
 # Create FastAPI app
@@ -84,6 +102,23 @@ app.add_middleware(
     allowed_hosts=["*"]  # Configure appropriately for production
 )
 
+
+# Rate limiting middleware
+@app.middleware("http")
+async def rate_limit_middleware(request, call_next):
+    """Rate limiting middleware."""
+    client_ip = request.client.host
+    rate_limit_key = f"rate_limit:{client_ip}"
+    
+    # Check rate limit (60 requests per minute)
+    if not await check_rate_limit(rate_limit_key, settings.rate_limit_per_minute, 60):
+        raise HTTPException(
+            status_code=429, 
+            detail="Rate limit exceeded. Please try again later."
+        )
+    
+    response = await call_next(request)
+    return response
 
 # Error handlers
 @app.exception_handler(Exception)
@@ -120,15 +155,21 @@ async def health_check():
     # Get agent health status
     health_status = await orchestrator.health_check()
     
+    # Get Redis health
+    redis_health = await redis_health_check()
+    
+    # Get Vector Store health
+    vector_store_health = await vector_store_health_check()
+    
     return HealthCheck(
         status=health_status["overall_status"],
         version=settings.app_version,
         timestamp=datetime.utcnow(),
         services={agent: status["status"] for agent, status in health_status["agents"].items()},
         database="connected",  # TODO: Add actual DB health check
-        redis="connected",     # TODO: Add actual Redis health check
+        redis=redis_health["status"],
         opa="connected",       # TODO: Add actual OPA health check
-        vector_store="connected"  # TODO: Add actual vector store health check
+        vector_store=vector_store_health["status"]
     )
 
 
@@ -180,6 +221,17 @@ async def get_case(
 ):
     """Get a case by ID."""
     try:
+        # Try to get from cache first
+        cache_key = f"case:{case_id}"
+        cached_case = await cache_get_json(cache_key)
+        
+        if cached_case:
+            # Check access permissions for cached data
+            if not can_access_case(current_user, cached_case):
+                raise HTTPException(status_code=403, detail="Access denied")
+            return CaseResponse(**cached_case)
+        
+        # If not in cache, get from database
         case_repo = CaseRepository(db)
         db_case = await case_repo.get_case(case_id)
         
@@ -189,6 +241,10 @@ async def get_case(
         # Check access permissions
         if not can_access_case(current_user, db_case):
             raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Cache the case for 5 minutes
+        case_data = CaseResponse.from_orm(db_case).dict()
+        await cache_set_json(cache_key, case_data, expire=300)
         
         return CaseResponse.from_orm(db_case)
         
@@ -716,6 +772,177 @@ async def upload_document(
     except Exception as e:
         await db.rollback()
         logger.error(f"Document upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Queue management endpoints
+@api_v1_router.post("/queue/jobs")
+async def enqueue_background_job(
+    job_type: str,
+    job_data: dict,
+    priority: int = 0,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Enqueue a background job."""
+    try:
+        # Add user info to job data
+        job_data["user_id"] = str(current_user.id)
+        job_data["timestamp"] = datetime.utcnow().isoformat()
+        
+        # Enqueue the job
+        await enqueue_job("background_jobs", {
+            "type": job_type,
+            "data": job_data
+        }, priority=priority)
+        
+        return {
+            "message": "Job enqueued successfully",
+            "job_type": job_type,
+            "priority": priority
+        }
+        
+    except Exception as e:
+        logger.error(f"Job enqueue failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.get("/queue/status")
+async def get_queue_status(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Get queue status and length."""
+    try:
+        queue_length = await get_queue_length("background_jobs")
+        
+        return {
+            "queue": "background_jobs",
+            "length": queue_length,
+            "status": "active"
+        }
+        
+    except Exception as e:
+        logger.error(f"Queue status check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Vector Store endpoints
+@api_v1_router.post("/vector-store/knowledge-base")
+async def add_knowledge_base_entry(
+    content: str,
+    metadata: dict,
+    category: str = "general",
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Add entry to knowledge base."""
+    try:
+        from .core.vector_store import add_knowledge_base_entry
+        
+        entry_id = await add_knowledge_base_entry(content, metadata, category)
+        
+        return {
+            "message": "Knowledge base entry added successfully",
+            "entry_id": entry_id,
+            "category": category
+        }
+        
+    except Exception as e:
+        logger.error(f"Knowledge base entry addition failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.get("/vector-store/knowledge-base/search")
+async def search_knowledge_base(
+    query: str,
+    n_results: int = 5,
+    category: Optional[str] = None,
+    threshold: float = 0.7,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Search knowledge base."""
+    try:
+        from .core.vector_store import search_knowledge_base
+        
+        results = await search_knowledge_base(query, n_results, category, threshold)
+        
+        return {
+            "query": query,
+            "results": results,
+            "total_results": len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Knowledge base search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/vector-store/documents")
+async def add_document_embedding(
+    document_id: str,
+    content: str,
+    metadata: dict,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Add document embedding for similarity search."""
+    try:
+        from .core.vector_store import add_document_embedding
+        
+        doc_id = await add_document_embedding(document_id, content, metadata)
+        
+        return {
+            "message": "Document embedding added successfully",
+            "document_id": doc_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Document embedding addition failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.get("/vector-store/documents/similar")
+async def find_similar_documents(
+    content: str,
+    n_results: int = 5,
+    threshold: float = 0.7,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Find similar documents."""
+    try:
+        from .core.vector_store import find_similar_documents
+        
+        results = await find_similar_documents(content, n_results, threshold)
+        
+        return {
+            "content": content,
+            "similar_documents": results,
+            "total_results": len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Similar document search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_v1_router.post("/vector-store/decision-support")
+async def get_decision_support(
+    case_context: str,
+    decision_type: str = "general",
+    n_results: int = 3,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """Get decision support information."""
+    try:
+        from .core.vector_store import get_decision_support
+        
+        support_info = await get_decision_support(case_context, decision_type, n_results)
+        
+        return {
+            "case_context": case_context,
+            "decision_type": decision_type,
+            "support_info": support_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Decision support failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
