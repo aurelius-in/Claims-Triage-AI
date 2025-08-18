@@ -35,6 +35,8 @@ help:
 	@echo "  health      - Check system health"
 	@echo "  grafana     - Open Grafana dashboard"
 	@echo "  prometheus  - Open Prometheus metrics"
+	@echo "  monitoring  - Setup monitoring stack"
+	@echo "  telemetry   - Test telemetry setup"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  docs        - Build documentation"
@@ -231,6 +233,18 @@ grafana:
 prometheus:
 	@echo "Opening Prometheus metrics..."
 	open http://localhost:9090
+
+monitoring:
+	@echo "Setting up monitoring stack..."
+	@docker-compose up -d prometheus grafana
+	@echo "Monitoring stack started:"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana: http://localhost:3001 (admin/admin)"
+
+telemetry:
+	@echo "Testing telemetry setup..."
+	@cd backend && python -c "from core.telemetry import setup_telemetry; setup_telemetry(); print('✅ Telemetry setup successful')"
+	@cd backend && python -c "from core.prometheus import get_metrics_collector; print('✅ Prometheus metrics collector available')"
 
 # Documentation
 docs:

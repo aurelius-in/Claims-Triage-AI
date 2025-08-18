@@ -15,7 +15,9 @@ from datetime import datetime
 
 from .core.config import settings, get_settings
 from .core.logging import setup_logging
-from .core.monitoring import setup_monitoring
+from .core.monitoring import setup_monitoring, instrument_application, shutdown_monitoring, get_health_status
+from .core.telemetry import trace_span, record_request_metric, record_triage_metric, record_agent_execution_metric
+from .core.prometheus import get_metrics, get_metrics_content_type
 from .core.auth import get_current_user, create_access_token, can_access_case
 from .core.redis import init_redis, close_redis, redis_health_check, check_rate_limit, cache_get_json, cache_set_json, enqueue_job, get_queue_length
 from .core.vector_store import init_vector_store, close_vector_store, vector_store_health_check
@@ -74,9 +76,18 @@ async def lifespan(app: FastAPI):
     orchestrator = AgentOrchestrator()
     logger.info("Agent orchestrator initialized")
     
-    # Setup monitoring
-    setup_monitoring()
+    # Setup monitoring and telemetry
+    setup_monitoring(
+        enable_telemetry=True,
+        enable_prometheus=True,
+        prometheus_port=settings.prometheus_port,
+        environment="development"
+    )
     logger.info("Monitoring setup complete")
+    
+    # Instrument the application
+    instrument_application(app)
+    logger.info("Application instrumentation complete")
     
     # Start background job processor
     asyncio.create_task(start_background_processor())
@@ -87,6 +98,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down Claims Triage AI application...")
     await stop_background_processor()
+    shutdown_monitoring()
     await close_db()
     await close_redis()
     await close_vector_store()
@@ -153,41 +165,16 @@ async def global_exception_handler(request, exc):
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint."""
-    global orchestrator
-    
-    if not orchestrator:
-        return HealthCheck(
-            status="unhealthy",
-            version=settings.app_version,
-            timestamp=datetime.utcnow(),
-            services={"orchestrator": "not_initialized"},
-            database="unknown",
-            redis="unknown",
-            opa="unknown",
-            vector_store="unknown"
-        )
-    
-    # Get agent health status
-    health_status = await orchestrator.health_check()
-    
-    # Get Redis health
-    redis_health = await redis_health_check()
-    
-    # Get Vector Store health
-    vector_store_health = await vector_store_health_check()
-    
-    # Get OPA health
-    opa_health = await opa_health_check()
-    
-    return HealthCheck(
-        status=health_status["overall_status"],
-        version=settings.app_version,
-        timestamp=datetime.utcnow(),
-        services={agent: status["status"] for agent, status in health_status["agents"].items()},
-        database="connected",  # TODO: Add actual DB health check
-        redis=redis_health["status"],
-        opa=opa_health["status"],
-        vector_store=vector_store_health["status"]
+    return get_health_status()
+
+
+# Prometheus metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(
+        content=get_metrics(),
+        media_type=get_metrics_content_type()
     )
 
 

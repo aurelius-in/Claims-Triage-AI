@@ -12,7 +12,19 @@ This module contains:
 
 from .config import Settings, get_settings
 from .logging import setup_logging
-from .monitoring import setup_monitoring
+from .monitoring import setup_monitoring, instrument_application, shutdown_monitoring, get_health_status
+from .telemetry import (
+    setup_telemetry, instrument_fastapi, instrument_sqlalchemy, instrument_redis, 
+    instrument_httpx, instrument_logging, shutdown_telemetry, trace_span, 
+    record_request_metric, record_triage_metric, record_agent_execution_metric,
+    get_current_trace_id, get_current_span_id, add_span_event, set_span_attribute,
+    trace_function
+)
+from .prometheus import (
+    start_prometheus_server, get_metrics, get_metrics_content_type,
+    get_metrics_collector, track_request, track_agent_execution, track_triage_request,
+    update_system_metrics, reset_metrics, track_metrics
+)
 from .auth import get_current_user, create_access_token
 from .redis import (
     get_redis_client, init_redis, close_redis,
@@ -64,6 +76,37 @@ __all__ = [
     "get_settings", 
     "setup_logging",
     "setup_monitoring",
+    "instrument_application",
+    "shutdown_monitoring",
+    "get_health_status",
+    # Telemetry exports
+    "setup_telemetry",
+    "instrument_fastapi",
+    "instrument_sqlalchemy",
+    "instrument_redis",
+    "instrument_httpx",
+    "instrument_logging",
+    "shutdown_telemetry",
+    "trace_span",
+    "record_request_metric",
+    "record_triage_metric",
+    "record_agent_execution_metric",
+    "get_current_trace_id",
+    "get_current_span_id",
+    "add_span_event",
+    "set_span_attribute",
+    "trace_function",
+    # Prometheus exports
+    "start_prometheus_server",
+    "get_metrics",
+    "get_metrics_content_type",
+    "get_metrics_collector",
+    "track_request",
+    "track_agent_execution",
+    "track_triage_request",
+    "update_system_metrics",
+    "reset_metrics",
+    "track_metrics",
     "get_current_user",
     "create_access_token",
     # Redis exports
