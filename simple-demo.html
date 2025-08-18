@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claims Triage AI - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+        }
+        
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00d4ff, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+        
+        .header p {
+            color: #888;
+            font-size: 1.1em;
+            font-weight: 300;
+        }
+        
+        .metrics-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .metric-item {
+            text-align: center;
+            position: relative;
+        }
+        
+        .metric-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+            position: relative;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .metric-item:nth-child(1) .metric-circle {
+            background: linear-gradient(135deg, #00d4ff, #4ecdc4);
+        }
+        
+        .metric-item:nth-child(2) .metric-circle {
+            background: linear-gradient(135deg, #ffeb3b, #ffc107);
+        }
+        
+        .metric-item:nth-child(3) .metric-circle {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+        }
+        
+        .metric-item:nth-child(4) .metric-circle {
+            background: linear-gradient(135deg, #66bb6a, #4caf50);
+        }
+        
+        .metric-item:nth-child(5) .metric-circle {
+            background: linear-gradient(135deg, #ffeb3b, #ffc107);
+        }
+        
+        .metric-item:nth-child(6) .metric-circle {
+            background: linear-gradient(135deg, #ffeb3b, #ffc107);
+        }
+        
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #000;
+        }
+        
+        .metric-label {
+            color: #888;
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .content-panel {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .panel-title {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .case-timeline {
+            position: relative;
+        }
+        
+        .case-timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #00d4ff, transparent);
+        }
+        
+        .case-item {
+            position: relative;
+            margin-bottom: 15px;
+            padding-left: 45px;
+        }
+        
+        .case-item::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 12px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #0a0a0a;
+            border: 2px solid #00d4ff;
+            z-index: 2;
+        }
+        
+        .case-item.critical::before {
+            border-color: #ff6b6b;
+            box-shadow: 0 0 15px rgba(255, 107, 107, 0.5);
+        }
+        
+        .case-item.high::before {
+            border-color: #ffa726;
+            box-shadow: 0 0 15px rgba(255, 167, 38, 0.5);
+        }
+        
+        .case-item.medium::before {
+            border-color: #4ecdc4;
+            box-shadow: 0 0 15px rgba(78, 205, 196, 0.5);
+        }
+        
+        .case-item.low::before {
+            border-color: #66bb6a;
+            box-shadow: 0 0 15px rgba(102, 187, 106, 0.5);
+        }
+        
+        .case-title {
+            font-size: 1em;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .case-details {
+            color: #888;
+            font-size: 0.8em;
+            line-height: 1.3;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .status-item:hover {
+            background: rgba(255,255,255,0.08);
+            transform: translateY(-2px);
+        }
+        
+        .status-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: #00d4ff;
+        }
+        
+        .status-text {
+            font-weight: 500;
+            color: #fff;
+            font-size: 0.9em;
+        }
+        
+        .api-section {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 15px;
+        }
+        
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .api-endpoint {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .api-endpoint::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b);
+        }
+        
+        .api-method {
+            color: #00d4ff;
+            font-weight: 600;
+            margin-bottom: 3px;
+            font-size: 0.9em;
+        }
+        
+        .api-path {
+            color: #fff;
+            font-size: 0.8em;
+        }
+        
+
+        
+        .features-section {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 15px;
+        }
+        
+        .logs-section {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .log-container {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 0.8em;
+            line-height: 1.4;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+        }
+        
+        .log-entry.info {
+            color: #4ecdc4;
+        }
+        
+        .log-entry.success {
+            color: #66bb6a;
+        }
+        
+        .log-entry.warning {
+            color: #ffa726;
+        }
+        
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        
+        .log-timestamp {
+            color: #888;
+            margin-right: 8px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .feature-item:hover {
+            background: rgba(255,255,255,0.08);
+            transform: translateY(-3px);
+        }
+        
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #00d4ff, #4ecdc4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            color: #0a0a0a;
+        }
+        
+        .feature-text {
+            color: #fff;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-section {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Claims Triage AI</h1>
+            <p>Intelligent Claims Processing Platform</p>
+        </div>
+        
+        <div class="metrics-section">
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">156</div>
+                </div>
+                <div class="metric-label">Total Cases</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">23</div>
+                </div>
+                <div class="metric-label">Pending</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">12</div>
+                </div>
+                <div class="metric-label">Completed Today</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">94.2%</div>
+                </div>
+                <div class="metric-label">SLA Compliance</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">2.3h</div>
+                </div>
+                <div class="metric-label">Avg Processing</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-circle">
+                    <div class="metric-value">87%</div>
+                </div>
+                <div class="metric-label">Accuracy Rate</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="content-panel">
+                <div class="panel-title">📋 Active Cases</div>
+                <div class="case-timeline">
+                    <div class="case-item critical">
+                        <div class="case-title">Medical Prior Authorization</div>
+                        <div class="case-details">Cardiac surgery approval needed - Critical Priority</div>
+                    </div>
+                    <div class="case-item high">
+                        <div class="case-title">Auto Insurance Claim</div>
+                        <div class="case-details">Vehicle damage from collision - High Priority</div>
+                    </div>
+                    <div class="case-item medium">
+                        <div class="case-title">Property Damage Claim</div>
+                        <div class="case-details">Home damage from storm - Medium Priority</div>
+                    </div>
+                    <div class="case-item low">
+                        <div class="case-title">Legal Consultation</div>
+                        <div class="case-details">Contract review request - Low Priority</div>
+                    </div>
+                    <div class="case-item medium">
+                        <div class="case-title">Workers Compensation</div>
+                        <div class="case-details">Injury claim processing - Medium Priority</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="content-panel">
+                <div class="panel-title">🔧 System Status</div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">AI Triage Engine</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Database</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Analytics</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">API Gateway</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Redis Cache</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Message Queue</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Monitoring</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Security Layer</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">Load Balancer</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">✓</div>
+                        <div class="status-text">CDN</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="api-section">
+            <div class="panel-title">📊 Real-time Analytics & KPIs</div>
+            <div class="api-grid">
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Processing Efficiency: 87% faster than manual</div>
+                </div>
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Accuracy Rate: 94.2% across all domains</div>
+                </div>
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Avg Response Time: 1.2 seconds</div>
+                </div>
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Cost Savings: $2.3M annually</div>
+                </div>
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Healthcare Cases: 45% of total volume</div>
+                </div>
+                <div class="api-endpoint">
+                    <div class="api-method"></div>
+                    <div class="api-path">Auto Claims: 32% automated processing</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features-section">
+            <div class="panel-title">🎯 Platform Features</div>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-text">AI-Powered Triage</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-text">Risk Assessment</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-text">Real-time Analytics</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🏥</div>
+                    <div class="feature-text">Multi-case Support</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⏱️</div>
+                    <div class="feature-text">SLA Monitoring</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🚀</div>
+                    <div class="feature-text">Scalable Architecture</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <div class="feature-text">Data Encryption</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-text">Mobile Integration</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔍</div>
+                    <div class="feature-text">Advanced Search</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="logs-section">
+            <div class="panel-title">🤖 AI Agent Analysis Results</div>
+            <div class="log-container">
+                <div class="log-entry info">
+                    <span class="log-timestamp">[Case #CT-2024-001]</span>🔍 <strong>ClassifierAgent:</strong> Healthcare Prior Authorization - Critical Urgency
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Risk Score: 0.87]</span>📊 <strong>RiskScorerAgent:</strong> High Risk - Cardiac surgery complexity detected
+                </div>
+                <div class="log-entry warning">
+                    <span class="log-timestamp">[SLA: 2h]</span>🔄 <strong>RouterAgent:</strong> Route to Specialist Team - Escalation Required
+                </div>
+                <div class="log-entry info">
+                    <span class="log-timestamp">[Actions]</span>💡 <strong>DecisionSupportAgent:</strong> Immediate medical director review + Peer consultation
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Compliance]</span>✅ <strong>ComplianceAgent:</strong> PII detected & redacted - Audit trail created
+                </div>
+                <div class="log-entry info">
+                    <span class="log-timestamp">[Case #CT-2024-002]</span>🔍 <strong>ClassifierAgent:</strong> Auto Insurance Claim - Medium Urgency
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Risk Score: 0.42]</span>📊 <strong>RiskScorerAgent:</strong> Low-Medium Risk - Standard collision assessment
+                </div>
+                <div class="log-entry info">
+                    <span class="log-timestamp">[SLA: 24h]</span>🔄 <strong>RouterAgent:</strong> Route to Standard Claims Team
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Actions]</span>💡 <strong>DecisionSupportAgent:</strong> Automated processing approved - No escalation needed
+                </div>
+                <div class="log-entry info">
+                    <span class="log-timestamp">[Case #CT-2024-003]</span>🔍 <strong>ClassifierAgent:</strong> Property Damage Claim - Low Urgency
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Risk Score: 0.23]</span>📊 <strong>RiskScorerAgent:</strong> Low Risk - Standard storm damage
+                </div>
+                <div class="log-entry info">
+                    <span class="log-timestamp">[SLA: 48h]</span>🔄 <strong>RouterAgent:</strong> Route to Property Claims Team
+                </div>
+                <div class="log-entry success">
+                    <span class="log-timestamp">[Actions]</span>💡 <strong>DecisionSupportAgent:</strong> Schedule adjuster inspection - Standard processing
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate metric values
+            const metricValues = document.querySelectorAll('.metric-value');
+            metricValues.forEach(metric => {
+                const finalValue = metric.textContent;
+                const isPercentage = finalValue.includes('%');
+                const isTime = finalValue.includes('h');
+                const numericValue = parseFloat(finalValue.replace('%', '').replace('h', ''));
+                
+                let current = 0;
+                const increment = numericValue / 100;
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= numericValue) {
+                        current = numericValue;
+                        clearInterval(timer);
+                    }
+                    if (isPercentage) {
+                        metric.textContent = Math.round(current) + '%';
+                    } else if (isTime) {
+                        metric.textContent = Math.round(current * 10) / 10 + 'h';
+                    } else {
+                        metric.textContent = Math.round(current);
+                    }
+                }, 30);
+            });
+            
+            // Add hover effects to interactive elements
+            const interactiveElements = document.querySelectorAll('.status-item, .feature-item, .api-endpoint');
+            interactiveElements.forEach(element => {
+                element.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.02)';
+                });
+                
+                element.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1)';
+                });
+            });
+            
+            // Add click effects
+            const clickableElements = document.querySelectorAll('.case-item, .status-item, .feature-item');
+            clickableElements.forEach(element => {
+                element.addEventListener('click', function() {
+                    this.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                    }, 150);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=triage_ai
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  # Simple Python FastAPI backend
+  backend:
+    image: python:3.11-slim
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=demo-secret-key
+      - DEBUG=true
+    volumes:
+      - ./demo-backend.py:/app/demo-backend.py
+    command: >
+      sh -c "pip install fastapi uvicorn &&
+             python demo-backend.py"
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+  # Simple React frontend
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./demo-frontend:/app
+    command: >
+      sh -c "npm install && npm start"
+    depends_on:
+      - backend
+    networks:
+      - triage-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  triage-network:
+    driver: bridge
