@@ -155,6 +155,11 @@ seed:
 	docker-compose exec backend python -m backend.scripts.seed_data
 	@echo "Database seeded!"
 
+seed-comprehensive:
+	@echo "Seeding database with comprehensive mock data..."
+	docker-compose exec backend python backend/scripts/seed_data.py
+	@echo "Comprehensive data seeded!"
+
 seed-knowledge-base:
 	@echo "Seeding knowledge base with initial data..."
 	docker-compose exec backend python backend/scripts/seed_knowledge_base.py
