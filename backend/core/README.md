@@ -10,6 +10,10 @@ The Redis integration provides comprehensive caching, queue management, rate lim
 
 The vector store integration provides RAG (Retrieval Augmented Generation) capabilities for decision support and knowledge base indexing.
 
+## Open Policy Agent (OPA) Integration
+
+The OPA integration provides policy-as-code capabilities for routing, compliance, access control, and data governance decisions.
+
 ### Features
 
 #### 1. **Redis Client Configuration**
@@ -92,14 +96,68 @@ await delete_session("session:abc123")
 - Redis health check endpoint
 - Connection status monitoring
 - Performance metrics collection
+- Cache statistics and management
 
 **Usage:**
 ```python
-from backend.core.redis import redis_health_check
+from backend.core.redis import redis_health_check, get_cache_stats
 
 # Check Redis health
 health = await redis_health_check()
 # Returns: {"status": "healthy", "version": "7.0.0", ...}
+
+# Get cache statistics
+stats = await get_cache_stats()
+# Returns: {"total_keys": 100, "used_memory": "1.2MB", ...}
+```
+
+#### 7. **Cache Decorator**
+- Automatic function result caching
+- Configurable expiration and key prefixes
+- Transparent cache integration
+
+**Usage:**
+```python
+from backend.core.redis import cache_result
+
+@cache_result(expire=3600, key_prefix="analytics")
+async def get_analytics_data(date_range: str):
+    # Expensive computation here
+    return {"data": "analytics_result"}
+
+# Result is automatically cached for 1 hour
+```
+
+#### 8. **Idempotency Keys**
+- Prevent duplicate request processing
+- Configurable expiration times
+- Automatic key management
+
+**Usage:**
+```python
+from backend.core.redis import set_idempotency_key, check_idempotency_key
+
+# Set idempotency key
+success = await set_idempotency_key("request:123", expire=300)
+
+# Check if key exists
+exists = await check_idempotency_key("request:123")
+```
+
+#### 9. **Cache Management**
+- Pattern-based cache clearing
+- Cache statistics and monitoring
+- Bulk cache operations
+
+**Usage:**
+```python
+from backend.core.redis import clear_cache_pattern
+
+# Clear all cache entries matching pattern
+await clear_cache_pattern("user:*")
+
+# Clear specific cache entries
+await clear_cache_pattern("case:123:*")
 ```
 
 ### API Endpoints
@@ -113,6 +171,11 @@ The Redis integration adds several new API endpoints:
 #### Queue Management
 - `POST /api/v1/queue/jobs` - Enqueue background job
 - `GET /api/v1/queue/status` - Get queue status
+
+#### Cache Management
+- `GET /api/v1/cache/stats` - Get cache statistics
+- `DELETE /api/v1/cache/clear` - Clear cache entries
+- `POST /api/v1/cache/idempotency` - Set idempotency key
 
 #### Health Check
 - `GET /health` - Includes Redis health status
@@ -285,3 +348,142 @@ All vector store operations include comprehensive error handling:
 - Similarity thresholds prevent irrelevant results
 - Metadata filtering improves search performance
 - Persistent storage ensures data durability
+
+### OPA Features
+
+#### 1. **OPA Client Configuration**
+- HTTP client for OPA server communication
+- Connection pooling and timeout handling
+- Health monitoring and status checks
+- Configurable via environment variables (`OPA_BASE_URL`, `OPA_TIMEOUT`)
+
+#### 2. **Policy Engine Integration**
+- Routing policy evaluation for case assignment
+- Compliance policy validation for case processing
+- Access control policy enforcement
+- Data governance policy management
+
+**Usage:**
+```python
+from backend.core.opa import evaluate_routing_policy, evaluate_compliance_policy
+
+# Evaluate routing policy
+routing_result = await evaluate_routing_policy({
+    "case_type": "auto_insurance",
+    "risk_level": "high",
+    "urgency_level": "normal"
+})
+
+# Evaluate compliance policy
+compliance_result = await evaluate_compliance_policy({
+    "title": "Case Title",
+    "description": "Case description",
+    "case_type": "health_insurance"
+})
+```
+
+#### 3. **Policy Management**
+- Policy creation, update, and deletion
+- Policy validation and syntax checking
+- Policy hot-reloading with file watcher
+- Policy versioning and metadata tracking
+
+**Usage:**
+```python
+from backend.core.opa import create_policy, update_policy, delete_policy, list_policies
+
+# Create new policy
+result = await create_policy("custom_routing", """
+package custom_routing
+
+default allow = false
+
+allow {
+    input.case.risk_level == "low"
+    input.case.urgency_level == "normal"
+}
+""")
+
+# List all policies
+policies = await list_policies()
+
+# Update policy
+await update_policy("custom_routing", updated_policy_content)
+
+# Delete policy
+await delete_policy("custom_routing")
+```
+
+#### 4. **Policy Hot-Reloading**
+- Automatic policy file monitoring
+- Real-time policy updates without restart
+- File change detection and validation
+- Error handling and rollback capabilities
+
+#### 5. **Default Policies**
+- **Routing Policy**: Case assignment based on type, risk, and urgency
+- **Compliance Policy**: Data validation and regulatory compliance
+- **Access Control Policy**: Role-based and team-based access control
+- **Data Governance Policy**: Data operations and retention rules
+
+#### 6. **Policy Validation**
+- Rego syntax validation
+- Policy structure verification
+- OPA server validation
+- Error reporting and debugging
+
+**Usage:**
+```python
+from backend.core.opa import validate_policy
+
+# Validate policy syntax
+validation_result = await validate_policy(policy_content)
+if validation_result["success"]:
+    print("Policy is valid")
+else:
+    print(f"Policy validation failed: {validation_result['error']}")
+```
+
+### OPA API Endpoints
+
+The OPA integration adds several new API endpoints:
+
+#### Policy Evaluation
+- `POST /api/v1/policies/routing/evaluate` - Evaluate routing policy
+- `POST /api/v1/policies/compliance/evaluate` - Evaluate compliance policy
+- `POST /api/v1/policies/access-control/evaluate` - Evaluate access control policy
+- `POST /api/v1/policies/data-governance/evaluate` - Evaluate data governance policy
+
+#### Policy Management
+- `POST /api/v1/policies` - Create new policy
+- `PUT /api/v1/policies/{policy_name}` - Update existing policy
+- `DELETE /api/v1/policies/{policy_name}` - Delete policy
+- `GET /api/v1/policies` - List all policies
+- `POST /api/v1/policies/validate` - Validate policy syntax
+
+### OPA Configuration
+
+OPA configuration is handled via environment variables:
+
+```bash
+# OPA server settings
+OPA_BASE_URL=http://localhost:8181
+OPA_TIMEOUT=30
+OPA_POLICIES_PATH=./policies
+```
+
+### OPA Error Handling
+
+All OPA operations include comprehensive error handling:
+- Connection failures are logged but don't crash the application
+- Policy evaluation failures are handled gracefully
+- Policy validation includes detailed error messages
+- Health checks provide detailed status information
+
+### OPA Performance Considerations
+
+- HTTP connection pooling reduces overhead
+- Policy caching improves evaluation performance
+- Hot-reloading minimizes downtime
+- Validation prevents invalid policies from being loaded
+- Health monitoring ensures system reliability
