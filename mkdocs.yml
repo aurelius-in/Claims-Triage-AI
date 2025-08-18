@@ -1,0 +1,141 @@
+site_name: Claims Triage AI Documentation
+site_description: Next-Generation Agent-Driven Case Triage Platform
+site_author: Claims Triage AI Team
+site_url: https://claimstriage.ai
+
+repo_name: yourusername/Claims-Triage-AI
+repo_url: https://github.com/yourusername/Claims-Triage-AI
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - footnotes
+  - meta
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:materialx.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - toc:
+      anchorlink: true
+      permalink: true
+      title: On this page
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/Claims-Triage-AI
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/claimstriage
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/claimstriage
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quick-start.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - Architecture:
+    - System Overview: architecture/overview.md
+    - Agent Architecture: architecture/agents.md
+    - Data Architecture: architecture/data.md
+    - Security Architecture: architecture/security.md
+  - API Reference:
+    - Authentication: api/authentication.md
+    - Cases: api/cases.md
+    - Triage: api/triage.md
+    - Analytics: api/analytics.md
+    - Audit: api/audit.md
+  - User Guides:
+    - Dashboard: user-guides/dashboard.md
+    - Case Management: user-guides/case-management.md
+    - Analytics: user-guides/analytics.md
+    - Settings: user-guides/settings.md
+  - Developer Guides:
+    - Setup: developer/setup.md
+    - Agent Development: developer/agents.md
+    - API Development: developer/api.md
+    - Frontend Development: developer/frontend.md
+    - Testing: developer/testing.md
+  - Deployment:
+    - Local Development: deployment/local.md
+    - Staging: deployment/staging.md
+    - Production: deployment/production.md
+    - Kubernetes: deployment/kubernetes.md
+    - Monitoring: deployment/monitoring.md
+  - Contributing:
+    - Code of Conduct: contributing/code-of-conduct.md
+    - Development Workflow: contributing/workflow.md
+    - Style Guide: contributing/style-guide.md
+    - Testing Guide: contributing/testing.md
