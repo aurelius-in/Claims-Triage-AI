@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from .core.security import setup_security_middleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import uvicorn
@@ -128,6 +129,9 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]  # Configure appropriately for production
 )
+
+# Setup security middleware
+setup_security_middleware(app)
 
 
 # Rate limiting middleware

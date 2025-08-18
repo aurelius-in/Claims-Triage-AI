@@ -268,4 +268,40 @@ make telemetry
 
 # Check Prometheus targets
 curl http://localhost:9090/api/v1/targets
+
+## Security Features
+
+### Security Middleware Stack
+
+The platform implements a comprehensive security middleware stack:
+
+1. **SecurityHeadersMiddleware**: Adds security headers to all responses
+2. **RequestSizeMiddleware**: Enforces request size limits
+3. **InputValidationMiddleware**: Validates and sanitizes input
+4. **PIIDetectionMiddleware**: Detects and logs PII in requests/responses
+5. **DataRetentionMiddleware**: Enforces data retention policies
+
+### Security Testing
+
+```bash
+# Run security tests
+make test-security
+
+# Test specific security components
+pytest backend/tests/test_security.py::TestSecurityHeadersMiddleware -v
+pytest backend/tests/test_security.py::TestInputValidationMiddleware -v
+pytest backend/tests/test_security.py::TestPIIDetectionMiddleware -v
+```
+
+### Security Configuration
+
+Security settings are configured in `config.py`:
+
+```python
+# Security settings
+pii_detection_enabled: bool = True
+rate_limit_per_minute: int = 60
+max_file_size: int = 10 * 1024 * 1024  # 10MB
+audit_log_retention_days: int = 365
+allowed_origins: List[str] = ["http://localhost:3000"]
 ```

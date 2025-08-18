@@ -71,6 +71,18 @@ from .opa import (
     validate_policy
 )
 
+from .security import (
+    setup_security_middleware,
+    sanitize_input,
+    validate_file_upload,
+    generate_audit_hash,
+    SecurityHeadersMiddleware,
+    RequestSizeMiddleware,
+    InputValidationMiddleware,
+    PIIDetectionMiddleware,
+    DataRetentionMiddleware
+)
+
 __all__ = [
     "Settings",
     "get_settings", 
@@ -160,5 +172,15 @@ __all__ = [
     "update_policy",
     "delete_policy",
     "list_policies",
-    "validate_policy"
+    "validate_policy",
+    # Security exports
+    "setup_security_middleware",
+    "sanitize_input",
+    "validate_file_upload",
+    "generate_audit_hash",
+    "SecurityHeadersMiddleware",
+    "RequestSizeMiddleware",
+    "InputValidationMiddleware",
+    "PIIDetectionMiddleware",
+    "DataRetentionMiddleware"
 ]
