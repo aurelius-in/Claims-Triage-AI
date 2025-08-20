@@ -4,7 +4,7 @@
 
 Transform your case processing with AI-powered agents that work across insurance, healthcare, finance, and legal domains. This platform combines cutting-edge machine learning, policy-based routing, and comprehensive compliance to deliver intelligent, scalable case triage.
 
-![Claims Triage AI Demo](run_demo.gif)
+![Claims Triage AI Demo](docs/images/claims_demo.gif)
 
 ## 🎯 What Makes This Special
 
