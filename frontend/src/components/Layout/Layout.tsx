@@ -32,6 +32,10 @@ const Layout: React.FC = () => {
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml: { sm: `${DRAWER_WIDTH}px` },
           zIndex: theme.zIndex.drawer + 1,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: 'none',
         }}
       >
         <Toolbar>
@@ -45,7 +49,19 @@ const Layout: React.FC = () => {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography 
+            variant="h6" 
+            noWrap 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              background: 'linear-gradient(135deg, #00d4ff, #ff6b6b, #4ecdc4)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              fontWeight: 800,
+            }}
+          >
             Claims Triage AI
           </Typography>
 
@@ -108,9 +124,11 @@ const Layout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: 1.5,
           width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
           mt: '64px', // AppBar height
+          background: '#0a0a0a',
+          minHeight: 'calc(100vh - 64px)',
         }}
       >
         <Outlet />

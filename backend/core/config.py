@@ -23,12 +23,12 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, env="PORT")
     
     # Security
-    secret_key: SecretStr = Field(env="SECRET_KEY")
+    secret_key: SecretStr = Field(default="your-secret-key-here", env="SECRET_KEY")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # Database
-    database_url: str = Field(env="DATABASE_URL")
+    database_url: str = Field(default="sqlite+aiosqlite:///./claims_triage.db", env="DATABASE_URL")
     redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
     
     # ML Models

@@ -1,162 +1,187 @@
 """
-Test database layer functionality.
+Tests for database implementation.
 """
+
 import pytest
 import asyncio
 from uuid import uuid4
-from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.data.database import get_test_db, create_tables, drop_tables
-from backend.data.repository import CaseRepository, UserRepository, TeamRepository
-from backend.data.schemas import CaseCreate, UserCreate, TeamCreate
-from backend.data.models import CaseType, UrgencyLevel, RiskLevel, UserRole
+from data.database import init_db, get_db_session, close_db
+from data.models import User, Case, CaseStatus, CasePriority, CaseType, UserRole
+from data.repository import user_repository, case_repository
+from core.auth import get_password_hash
 
 
 @pytest.fixture
 async def db_session():
-    """Create a test database session."""
-    async for session in get_test_db():
+    """Create a database session for testing."""
+    await init_db()
+    async with get_db_session() as session:
         yield session
-
-
-@pytest.fixture
-async def setup_db():
-    """Setup test database."""
-    await create_tables()
-    yield
-    await drop_tables()
+    await close_db()
 
 
 @pytest.mark.asyncio
-async def test_create_case(db_session, setup_db):
-    """Test case creation."""
-    case_repo = CaseRepository(db_session)
-    
-    case_data = CaseCreate(
-        external_id="TEST-001",
-        case_type=CaseType.AUTO_INSURANCE,
-        title="Test Auto Claim",
-        description="Test auto insurance claim",
-        urgency_level=UrgencyLevel.MEDIUM,
-        risk_level=RiskLevel.LOW,
-        risk_score=0.3
-    )
-    
-    case = await case_repo.create_case(case_data)
-    await db_session.commit()
-    
-    assert case.id is not None
-    assert case.external_id == "TEST-001"
-    assert case.case_type == CaseType.AUTO_INSURANCE
-    assert case.title == "Test Auto Claim"
+async def test_database_connection(db_session: AsyncSession):
+    """Test database connection and basic operations."""
+    # Test that we can execute a simple query
+    result = await db_session.execute("SELECT 1")
+    assert result.scalar() == 1
 
 
 @pytest.mark.asyncio
-async def test_create_user(db_session, setup_db):
-    """Test user creation."""
-    user_repo = UserRepository(db_session)
-    
-    user_data = UserCreate(
+async def test_user_creation(db_session: AsyncSession):
+    """Test user creation and retrieval."""
+    # Create a test user
+    test_user = User(
         username="testuser",
         email="test@example.com",
-        hashed_password="hashed_password",
+        hashed_password=get_password_hash("testpass"),
         full_name="Test User",
-        role=UserRole.AGENT
+        role=UserRole.ANALYST,
+        is_active=True
     )
     
-    user = await user_repo.create_user(user_data)
+    db_session.add(test_user)
     await db_session.commit()
+    await db_session.refresh(test_user)
     
+    # Verify user was created
+    assert test_user.id is not None
+    assert test_user.username == "testuser"
+    assert test_user.email == "test@example.com"
+    assert test_user.role == UserRole.ANALYST
+
+
+@pytest.mark.asyncio
+async def test_case_creation(db_session: AsyncSession):
+    """Test case creation and retrieval."""
+    # Create a test user first
+    test_user = User(
+        username="caseuser",
+        email="case@example.com",
+        hashed_password=get_password_hash("testpass"),
+        full_name="Case User",
+        role=UserRole.ANALYST,
+        is_active=True
+    )
+    db_session.add(test_user)
+    await db_session.commit()
+    await db_session.refresh(test_user)
+    
+    # Create a test case
+    test_case = Case(
+        case_number="TEST-001",
+        title="Test Case",
+        description="A test case for testing",
+        case_type=CaseType.AUTO_CLAIM,
+        customer_name="John Doe",
+        customer_email="john@example.com",
+        claim_amount=5000.00,
+        priority=CasePriority.NORMAL,
+        assigned_user_id=test_user.id
+    )
+    
+    db_session.add(test_case)
+    await db_session.commit()
+    await db_session.refresh(test_case)
+    
+    # Verify case was created
+    assert test_case.id is not None
+    assert test_case.case_number == "TEST-001"
+    assert test_case.title == "Test Case"
+    assert test_case.case_type == CaseType.AUTO_CLAIM
+    assert test_case.priority == CasePriority.NORMAL
+    assert test_case.status == CaseStatus.PENDING  # Default status
+
+
+@pytest.mark.asyncio
+async def test_user_repository(db_session: AsyncSession):
+    """Test user repository operations."""
+    # Create a test user using repository
+    user_data = {
+        "username": "repouser",
+        "email": "repo@example.com",
+        "hashed_password": get_password_hash("testpass"),
+        "full_name": "Repo User",
+        "role": UserRole.REVIEWER,
+        "is_active": True
+    }
+    
+    user = await user_repository.create(db_session, **user_data)
     assert user.id is not None
-    assert user.username == "testuser"
-    assert user.email == "test@example.com"
-    assert user.role == UserRole.AGENT
+    assert user.username == "repouser"
+    
+    # Test get by username
+    retrieved_user = await user_repository.get_by_username(db_session, "repouser")
+    assert retrieved_user is not None
+    assert retrieved_user.email == "repo@example.com"
+    
+    # Test get by email
+    retrieved_user = await user_repository.get_by_email(db_session, "repo@example.com")
+    assert retrieved_user is not None
+    assert retrieved_user.username == "repouser"
 
 
 @pytest.mark.asyncio
-async def test_create_team(db_session, setup_db):
-    """Test team creation."""
-    team_repo = TeamRepository(db_session)
-    
-    team_data = TeamCreate(
-        name="Test Team",
-        description="Test team description",
-        domain="insurance",
-        capacity=10,
-        sla_target_hours=24
+async def test_case_repository(db_session: AsyncSession):
+    """Test case repository operations."""
+    # Create a test user first
+    test_user = User(
+        username="caserepouser",
+        email="caserepo@example.com",
+        hashed_password=get_password_hash("testpass"),
+        full_name="Case Repo User",
+        role=UserRole.ANALYST,
+        is_active=True
     )
-    
-    team = await team_repo.create_team(team_data)
+    db_session.add(test_user)
     await db_session.commit()
+    await db_session.refresh(test_user)
     
-    assert team.id is not None
-    assert team.name == "Test Team"
-    assert team.domain == "insurance"
-    assert team.capacity == 10
+    # Create test cases using repository
+    case_data = {
+        "case_number": "REPO-001",
+        "title": "Repository Test Case",
+        "description": "Testing case repository",
+        "case_type": CaseType.HOME_CLAIM,
+        "customer_name": "Jane Smith",
+        "customer_email": "jane@example.com",
+        "claim_amount": 15000.00,
+        "priority": CasePriority.HIGH,
+        "assigned_user_id": test_user.id
+    }
+    
+    case = await case_repository.create(db_session, **case_data)
+    assert case.id is not None
+    assert case.case_number == "REPO-001"
+    
+    # Test get by case number
+    retrieved_case = await case_repository.get_by_case_number(db_session, "REPO-001")
+    assert retrieved_case is not None
+    assert retrieved_case.title == "Repository Test Case"
+    
+    # Test get cases by status
+    pending_cases = await case_repository.get_cases_by_status(db_session, CaseStatus.PENDING)
+    assert len(pending_cases) >= 1
+    assert any(c.case_number == "REPO-001" for c in pending_cases)
+    
+    # Test get cases by priority
+    high_priority_cases = await case_repository.get_cases_by_priority(db_session, CasePriority.HIGH)
+    assert len(high_priority_cases) >= 1
+    assert any(c.case_number == "REPO-001" for c in high_priority_cases)
 
 
 @pytest.mark.asyncio
-async def test_list_cases(db_session, setup_db):
-    """Test case listing."""
-    case_repo = CaseRepository(db_session)
+async def test_database_health_check():
+    """Test database health check functionality."""
+    await init_db()
     
-    # Create multiple cases
-    for i in range(3):
-        case_data = CaseCreate(
-            external_id=f"TEST-{i:03d}",
-            case_type=CaseType.AUTO_INSURANCE,
-            title=f"Test Case {i}",
-            description=f"Test case {i} description",
-            urgency_level=UrgencyLevel.MEDIUM,
-            risk_level=RiskLevel.LOW,
-            risk_score=0.3
-        )
-        await case_repo.create_case(case_data)
+    from data.database import health_check
+    health_status = await health_check()
     
-    await db_session.commit()
+    assert health_status["status"] == "healthy"
+    assert health_status["database"] == "postgresql"
     
-    # List cases
-    cases = await case_repo.list_cases(limit=10)
-    assert len(cases) == 3
-    assert cases[0].external_id == "TEST-002"  # Most recent first
-
-
-@pytest.mark.asyncio
-async def test_case_filtering(db_session, setup_db):
-    """Test case filtering."""
-    case_repo = CaseRepository(db_session)
-    
-    # Create cases with different types
-    case_data_1 = CaseCreate(
-        external_id="AUTO-001",
-        case_type=CaseType.AUTO_INSURANCE,
-        title="Auto Claim",
-        description="Auto insurance claim",
-        urgency_level=UrgencyLevel.MEDIUM,
-        risk_level=RiskLevel.LOW,
-        risk_score=0.3
-    )
-    
-    case_data_2 = CaseCreate(
-        external_id="HEALTH-001",
-        case_type=CaseType.HEALTH_INSURANCE,
-        title="Health Claim",
-        description="Health insurance claim",
-        urgency_level=UrgencyLevel.HIGH,
-        risk_level=RiskLevel.MEDIUM,
-        risk_score=0.6
-    )
-    
-    await case_repo.create_case(case_data_1)
-    await case_repo.create_case(case_data_2)
-    await db_session.commit()
-    
-    # Filter by case type
-    auto_cases = await case_repo.list_cases(case_type=CaseType.AUTO_INSURANCE)
-    assert len(auto_cases) == 1
-    assert auto_cases[0].case_type == CaseType.AUTO_INSURANCE
-    
-    # Filter by urgency level
-    high_urgency_cases = await case_repo.list_cases(urgency_level=UrgencyLevel.HIGH)
-    assert len(high_urgency_cases) == 1
-    assert high_urgency_cases[0].urgency_level == UrgencyLevel.HIGH
+    await close_db()
