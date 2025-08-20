@@ -33,8 +33,33 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
+def validate_password_strength(password: str) -> bool:
+    """
+    SECURITY: Validate password strength according to policy.
+    
+    Requirements:
+    - At least 8 characters long
+    - Contains at least one uppercase letter
+    - Contains at least one lowercase letter
+    - Contains at least one digit
+    - Contains at least one special character
+    """
+    if len(password) < 8:
+        return False
+    
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
+    
+    return has_upper and has_lower and has_digit and has_special
+
+
 def get_password_hash(password: str) -> str:
     """Hash a password."""
+    # SECURITY: Validate password strength before hashing
+    if not validate_password_strength(password):
+        raise ValueError("Password does not meet strength requirements")
     return pwd_context.hash(password)
 
 
@@ -78,22 +103,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if token_data is None:
             raise credentials_exception
         
-        # TODO: Get user from database
-        # For now, return a mock user
-        if token_data.username == "admin":
+        # Get user from database
+        from ..data.database import get_db_session
+        from ..data.repository import user_repository
+        
+        async with get_db_session() as session:
+            user = await user_repository.get_by_username(session, token_data.username)
+            if not user or not user.is_active:
+                raise credentials_exception
+            
             return UserResponse(
-                id="admin-user-id",
-                email="admin@example.com",
-                username="admin",
-                full_name="Administrator",
-                role=UserRole.ADMIN,
-                team_id=None,
-                is_active=True,
-                created_at=datetime.utcnow(),
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                full_name=user.full_name,
+                role=user.role,
+                team_id=None,  # TODO: Add team relationship
+                is_active=user.is_active,
+                created_at=user.created_at,
                 last_login=datetime.utcnow()
             )
-        else:
-            raise credentials_exception
             
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}")

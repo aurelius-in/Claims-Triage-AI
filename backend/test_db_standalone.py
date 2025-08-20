@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-Simple database test that bypasses complex dependencies.
+Standalone database test with absolute imports.
 """
 
 import asyncio
 import sys
 import os
+import uuid
+from datetime import datetime
+from typing import Optional
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Mock settings for testing
+class MockSettings:
+    database_url = "sqlite+aiosqlite:///./test_claims_triage.db"
+    debug = True
+
+# Mock the config module
+sys.modules['core.config'] = type('MockConfig', (), {'settings': MockSettings()})()
+
 async def test_database():
     """Test the database implementation."""
     try:
-        # Import only the essential modules
+        # Import database modules
         from data.database import init_db, get_db_session, close_db
         from data.models import User, Case, CaseStatus, CasePriority, CaseType, UserRole
         from data.repository import user_repository, case_repository
@@ -70,6 +81,13 @@ async def test_database():
         
         await close_db()
         print("✅ Database implementation test completed successfully!")
+        
+        # Clean up test database
+        try:
+            os.remove("./test_claims_triage.db")
+            print("✅ Test database cleaned up")
+        except:
+            pass
         
     except Exception as e:
         print(f"❌ Database implementation test failed: {str(e)}")

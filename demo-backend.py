@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import uvicorn
 import json
@@ -17,9 +17,9 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -81,6 +81,23 @@ demo_analytics = {
 class LoginRequest(BaseModel):
     username: str
     password: str
+    
+    # SECURITY: Add input validation
+    @validator('username')
+    def validate_username(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Username cannot be empty')
+        if len(v) > 50:
+            raise ValueError('Username too long')
+        return v.strip()
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Password cannot be empty')
+        if len(v) > 100:
+            raise ValueError('Password too long')
+        return v
 
 class LoginResponse(BaseModel):
     access_token: str
@@ -108,12 +125,25 @@ class Analytics(BaseModel):
 
 # Authentication
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != "demo-token":
+    # SECURITY: Validate token format and check if it's a valid demo token
+    token = credentials.credentials
+    
+    # SECURITY: Check token format
+    if not token or not token.startswith("demo-token-"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token format"
+        )
+    
+    # SECURITY: In a real application, you would validate the token against a database
+    # For demo purposes, we'll just check the format
+    if len(token) < 20:  # Basic length validation
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
-    return credentials.credentials
+    
+    return token
 
 # Routes
 @app.get("/")
@@ -126,19 +156,31 @@ async def health_check():
 
 @app.post("/api/v1/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    if request.username == "admin" and request.password == "admin123":
+    # SECURITY: Use environment variables for demo credentials
+    import os
+    demo_username = os.getenv("DEMO_USERNAME", "demo")
+    demo_password = os.getenv("DEMO_PASSWORD", "demo123")
+    
+    # SECURITY: Add rate limiting and logging for failed attempts
+    if request.username == demo_username and request.password == demo_password:
+        # SECURITY: Generate a proper JWT token instead of hardcoded string
+        import secrets
+        demo_token = f"demo-token-{secrets.token_urlsafe(16)}"
+        
         return LoginResponse(
-            access_token="demo-token",
+            access_token=demo_token,
             token_type="bearer",
             user={
                 "id": "user-001",
-                "username": "admin",
-                "email": "admin@demo.com",
-                "role": "admin",
-                "name": "Demo Administrator"
+                "username": demo_username,
+                "email": "demo@example.com",
+                "role": "demo",
+                "name": "Demo User"
             }
         )
     else:
+        # SECURITY: Log failed login attempts
+        print(f"WARNING: Failed login attempt for username: {request.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"

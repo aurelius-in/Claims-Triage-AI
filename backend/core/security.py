@@ -391,6 +391,114 @@ def generate_audit_hash(data: Dict[str, Any], previous_hash: Optional[str] = Non
     return hashlib.sha256(hash_string.encode()).hexdigest()
 
 
+def secure_error_response(error: Exception, debug: bool = False) -> str:
+    """
+    SECURITY: Return safe error messages to prevent information leakage.
+    
+    Args:
+        error: The original exception
+        debug: Whether to return detailed error in debug mode
+        
+    Returns:
+        Safe error message for users
+    """
+    if debug:
+        return str(error)
+    else:
+        # Return generic error message to prevent information leakage
+        return "Internal server error"
+
+
+def sanitize_error_log(error: Exception) -> str:
+    """
+    SECURITY: Sanitize error messages for logging to prevent sensitive data exposure.
+    
+    Args:
+        error: The original exception
+        
+    Returns:
+        Sanitized error message for logging
+    """
+    error_msg = str(error)
+    
+    # Remove potential sensitive information
+    sensitive_patterns = [
+        r'password[=:]\s*\S+',
+        r'secret[=:]\s*\S+',
+        r'token[=:]\s*\S+',
+        r'key[=:]\s*\S+',
+        r'api_key[=:]\s*\S+',
+        r'connection_string[=:]\s*\S+',
+        r'database_url[=:]\s*\S+',
+    ]
+    
+    import re
+    for pattern in sensitive_patterns:
+        error_msg = re.sub(pattern, r'\1=***REDACTED***', error_msg, flags=re.IGNORECASE)
+    
+    return error_msg
+
+
+def encrypt_sensitive_data(data: str, key: str = None) -> str:
+    """
+    SECURITY: Encrypt sensitive data using Fernet (symmetric encryption).
+    
+    Args:
+        data: Data to encrypt
+        key: Encryption key (uses settings.secret_key if not provided)
+        
+    Returns:
+        Encrypted data as base64 string
+    """
+    try:
+        from cryptography.fernet import Fernet
+        import base64
+        
+        if key is None:
+            # Use the first 32 bytes of the secret key for Fernet
+            secret_key = settings.secret_key.get_secret_value()
+            key = base64.urlsafe_b64encode(secret_key[:32].encode())
+        
+        f = Fernet(key)
+        encrypted_data = f.encrypt(data.encode())
+        return base64.urlsafe_b64encode(encrypted_data).decode()
+        
+    except Exception as e:
+        logger.error(f"Encryption failed: {str(e)}")
+        # Fallback: return hashed version for non-reversible storage
+        return hashlib.sha256(data.encode()).hexdigest()
+
+
+def decrypt_sensitive_data(encrypted_data: str, key: str = None) -> str:
+    """
+    SECURITY: Decrypt sensitive data using Fernet.
+    
+    Args:
+        encrypted_data: Encrypted data as base64 string
+        key: Encryption key (uses settings.secret_key if not provided)
+        
+    Returns:
+        Decrypted data
+    """
+    try:
+        from cryptography.fernet import Fernet
+        import base64
+        
+        if key is None:
+            # Use the first 32 bytes of the secret key for Fernet
+            secret_key = settings.secret_key.get_secret_value()
+            key = base64.urlsafe_b64encode(secret_key[:32].encode())
+        
+        f = Fernet(key)
+        encrypted_bytes = base64.urlsafe_b64decode(encrypted_data.encode())
+        decrypted_data = f.decrypt(encrypted_bytes)
+        return decrypted_data.decode()
+        
+    except Exception as e:
+        logger.error(f"Decryption failed: {str(e)}")
+        raise ValueError("Failed to decrypt data")
+
+
 # Middleware setup function
 def setup_security_middleware(app):
     """Setup all security middleware."""

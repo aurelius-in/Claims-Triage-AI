@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     feature_store_path: str = Field(default="./ml/features", env="FEATURE_STORE_PATH")
     
     # LLM Configuration
-    openai_api_key: Optional[SecretStr] = Field(default=None, env="OPENAI_API_KEY")
-    anthropic_api_key: Optional[SecretStr] = Field(default=None, env="ANTHROPIC_API_KEY")
+    openai_api_key: Optional[SecretStr] = Field(default=SecretStr(""), env="OPENAI_API_KEY")
+    anthropic_api_key: Optional[SecretStr] = Field(default=SecretStr(""), env="ANTHROPIC_API_KEY")
     default_llm_provider: str = Field(default="openai", env="DEFAULT_LLM_PROVIDER")
     
     # OPA (Open Policy Agent)
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     
     # Vector Store
     vector_store_url: str = Field(default="http://localhost:6333", env="VECTOR_STORE_URL")
-    vector_store_api_key: Optional[SecretStr] = Field(default=None, env="VECTOR_STORE_API_KEY")
+    vector_store_api_key: Optional[SecretStr] = Field(default=SecretStr(""), env="VECTOR_STORE_API_KEY")
     
     # Monitoring
     prometheus_port: int = Field(default=9090, env="PROMETHEUS_PORT")
