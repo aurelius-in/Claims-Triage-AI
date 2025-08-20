@@ -54,34 +54,50 @@ const AppContent: React.FC = () => {
   // Create MUI theme based on Redux state
   const muiTheme = createTheme({
     palette: {
-      mode: theme.mode,
+      mode: 'dark',
+      background: {
+        default: '#0a0a0a',
+        paper: 'rgba(255,255,255,0.05)',
+      },
       primary: {
-        main: theme.primaryColor,
+        main: '#00d4ff',
       },
       secondary: {
-        main: theme.secondaryColor,
+        main: '#4ecdc4',
+      },
+      text: {
+        primary: '#ffffff',
+        secondary: '#888888',
       },
     },
     typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
       h1: {
-        fontSize: '2.5rem',
-        fontWeight: 600,
+        fontSize: '2.2rem',
+        fontWeight: 800,
+        background: 'linear-gradient(135deg, #00d4ff, #ff6b6b, #4ecdc4)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        letterSpacing: '-1px',
       },
       h2: {
-        fontSize: '2rem',
-        fontWeight: 600,
+        fontSize: '1.8rem',
+        fontWeight: 700,
+        color: '#00d4ff',
       },
       h3: {
-        fontSize: '1.75rem',
-        fontWeight: 600,
+        fontSize: '1.5rem',
+        fontWeight: 700,
+        color: '#00d4ff',
       },
       h4: {
-        fontSize: '1.5rem',
-        fontWeight: 600,
+        fontSize: '1.3rem',
+        fontWeight: 700,
+        color: '#00d4ff',
       },
       h5: {
-        fontSize: '1.25rem',
+        fontSize: '1.1rem',
         fontWeight: 600,
       },
       h6: {
@@ -95,21 +111,36 @@ const AppContent: React.FC = () => {
           root: {
             textTransform: 'none',
             borderRadius: 8,
+            fontWeight: 600,
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            borderRadius: 15,
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: 'none',
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
           root: {
+            borderRadius: 15,
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(10px)',
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
             borderRadius: 12,
+            fontWeight: 500,
           },
         },
       },

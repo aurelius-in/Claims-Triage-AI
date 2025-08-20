@@ -27,8 +27,8 @@ from .core.background_jobs import start_background_processor, stop_background_pr
 from .data.schemas import *
 from .data.database import get_db, init_db, close_db
 from .data.repository import (
-    CaseRepository, UserRepository, TeamRepository, 
-    DocumentRepository, AuditRepository, TriageResultRepository
+    case_repository, user_repository, team_repository, 
+    document_repository, audit_repository, triage_result_repository
 )
 from .agents.orchestrator import AgentOrchestrator
 
