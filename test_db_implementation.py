@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
 """
-Simple database test that bypasses complex dependencies.
+Simple test script to verify the database implementation.
 """
 
 import asyncio
 import sys
 import os
+from pathlib import Path
 
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the backend directory to the Python path
+backend_dir = Path(__file__).parent / "backend"
+sys.path.insert(0, str(backend_dir))
 
 async def test_database():
     """Test the database implementation."""
     try:
-        # Import only the essential modules
         from data.database import init_db, get_db_session, close_db
         from data.models import User, Case, CaseStatus, CasePriority, CaseType, UserRole
         from data.repository import user_repository, case_repository
-        
-        # Simple password hash function for testing
-        def get_password_hash(password: str) -> str:
-            return f"hashed_{password}"
+        from core.auth import get_password_hash
         
         print("🔧 Testing database implementation...")
         
@@ -67,6 +65,14 @@ async def test_database():
                 print("✅ Data retrieval working correctly")
             else:
                 print("❌ Data retrieval failed")
+        
+        # Test health check
+        from data.database import health_check
+        health_status = await health_check()
+        if health_status["status"] == "healthy":
+            print("✅ Database health check passed")
+        else:
+            print(f"❌ Database health check failed: {health_status}")
         
         await close_db()
         print("✅ Database implementation test completed successfully!")
